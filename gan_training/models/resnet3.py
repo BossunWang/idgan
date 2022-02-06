@@ -12,7 +12,7 @@ class Generator(nn.Module):
         super().__init__()
         self.z_dim = z_dim
 
-        s0 = self.s0 = 4
+        s0 = self.s0 = 7
         nf = self.nf = nfilter
         nf_max = self.nf_max = nfilter_max
 
@@ -20,7 +20,7 @@ class Generator(nn.Module):
         nlayers = int(np.log2(size / s0))
         self.nf0 = min(nf_max, nf * 2**nlayers)
 
-        self.fc = nn.Linear(z_dim, self.nf0*s0*s0)
+        self.fc = nn.Linear(z_dim, self.nf0 * s0 * s0)
 
         blocks = []
         for i in range(nlayers):
@@ -51,7 +51,7 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, z_dim, size, nfilter=64, nfilter_max=1024):
         super().__init__()
-        s0 = self.s0 = 4
+        s0 = self.s0 = 7
         nf = self.nf = nfilter
         nf_max = self.nf_max = nfilter_max
 
@@ -73,7 +73,7 @@ class Discriminator(nn.Module):
 
         self.conv_img = nn.Conv2d(3, 1*nf, 3, padding=1)
         self.resnet = nn.Sequential(*blocks)
-        self.fc = nn.Linear(self.nf0*s0*s0, 1)
+        self.fc = nn.Linear(self.nf0 * s0 * s0, 1)
 
     def forward(self, x):
         batch_size = x.size(0)
@@ -122,3 +122,19 @@ class ResnetBlock(nn.Module):
 def actvn(x):
     out = F.leaky_relu(x, 2e-1)
     return out
+
+
+if __name__ == '__main__':
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    c_dim = 40
+    size = 112
+    generator = Generator(c_dim, size).to(device)
+
+    c = torch.rand(1, c_dim).to(device)
+    output = generator(c)
+    print(output.size())
+
+    discriminator = Discriminator(c_dim, size, nfilter_max=512).to(device)
+    dis_out = discriminator(output)
+    print(dis_out.size())

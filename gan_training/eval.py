@@ -7,6 +7,7 @@ from gan_training.metrics import inception_score
 
 from scipy.stats import truncnorm
 
+
 def truncated_z_sample(batch_size, z_dim, truncation=1., seed=None):
     values = truncnorm.rvs(-2, 2, size=(batch_size, z_dim))
     return torch.from_numpy(truncation * values)
@@ -19,21 +20,26 @@ def is_power_of_2(num):
 def generator_postprocess(x):
     return x.add(1).div(2).clamp(0, 1)
 
+
 def decoder_postprocess(x):
     return torch.sigmoid(x)
+
 
 gp = generator_postprocess
 dp = decoder_postprocess
 
+
 class Evaluator(object):
-    def __init__(self, generator, zdist, batch_size=64,
-                 inception_nsamples=60000, device=None, dvae=None):
+    def __init__(self, generator, dvae, zdist, batch_size=64,
+                 inception_nsamples=60000, device=None):
         self.generator = generator
         self.zdist = zdist
         self.inception_nsamples = inception_nsamples
         self.batch_size = batch_size
         self.device = device
         self.dvae = dvae
+        self.generator.eval()
+        self.dvae.eval()
 
     def compute_inception_score(self):
         self.generator.eval()
@@ -52,14 +58,30 @@ class Evaluator(object):
 
         return score, score_std
 
-    def create_samples(self, z):
-        self.generator.eval()
-        batch_size = z.size(0)
-
-        # Sample x
+    def reconstruct(self, x_real):
         with torch.no_grad():
-            x = self.generator(z)
-        return x
+            x_recon, c, mu, logvar = self.dvae(x_real)
+        return x_recon.sigmoid()
+
+    def create_random_samples(self, z, c):
+        with torch.no_grad():
+            z_ = torch.cat([z, c], 1)
+            x_fake = self.generator(z_)
+        return x_fake
+
+    def create_mu_samples(self, z, x_real):
+        with torch.no_grad():
+            c, c_mu, c_logvar = cs = self.dvae(x_real, encode_only=True)
+            z_ = torch.cat([z, c_mu], 1)
+            x_mu_fake = self.generator(z_)
+        return x_mu_fake
+
+    def create_samples(self, z, x_real):
+        with torch.no_grad():
+            c, c_mu, c_logvar = cs = self.dvae(x_real, encode_only=True)
+            z_ = torch.cat([z, c], 1)
+            x_fake = self.generator(z_)
+        return x_fake
 
 
 class DisentEvaluator(object):
@@ -71,7 +93,6 @@ class DisentEvaluator(object):
         self.batch_size = batch_size
         self.device = device
         self.dvae = dvae
-
 
     @torch.no_grad()
     def save_samples(self, zdist, cdist, out_dir, batch_size=64, N=50000):
@@ -164,7 +185,8 @@ class DisentEvaluator(object):
             for val in interpolation:
                 c[:, c_dim] = val
                 z_ = torch.cat([z, c], 1)
-                idgan_sample = F.adaptive_avg_pool2d(gp(self.generator(z_)), (64, 64)).data.cpu()
+                # idgan_sample = F.adaptive_avg_pool2d(gp(self.generator(z_)), (64, 64)).data.cpu()
+                idgan_sample = gp(self.generator(z_)).data.cpu()
                 idgan_samples.append(idgan_sample)
                 dvae_sample = dp(self.dvae(c=c, decode_only=True)).data.cpu()
                 dvae_samples.append(dvae_sample)
@@ -172,7 +194,8 @@ class DisentEvaluator(object):
                 c_zero[:, c_dim] = val
                 c_p = c_ + c_zero
                 z_p_ = torch.cat([z, c_p], 1)
-                idgan_sample_p = F.adaptive_avg_pool2d(gp(self.generator(z_p_)), (64, 64)).data.cpu()
+                # idgan_sample_p = F.adaptive_avg_pool2d(gp(self.generator(z_p_)), (64, 64)).data.cpu()
+                idgan_sample_p = gp(self.generator(z_p_)).data.cpu()
                 idgan_samples_p.append(idgan_sample_p)
                 dvae_sample_p = dp(self.dvae(c=c_p, decode_only=True)).data.cpu()
                 dvae_samples_p.append(dvae_sample_p)

@@ -10,7 +10,7 @@ def load_config(path):
     # with open(DEFAULT_CONFIG, 'r') as f:
     #     config = yaml.load(f)
     with open(path, 'r') as f:
-        config = yaml.load(f)
+        config = yaml.load(f, Loader=yaml.FullLoader)
     # config.update(config_new)
     return config
 
@@ -25,7 +25,7 @@ def build_models(config):
     dvae = dVAE(
         c_dim=config['dvae']['c_dim'],
         nc=config['dvae']['nc'],
-        infodistil_mode=True
+        infodistil_mode=False
     )
     generator = Generator(
         z_dim=config['z_dist']['dim']+config['dvae']['c_dim'],

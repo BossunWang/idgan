@@ -3,6 +3,9 @@ import sys
 from PIL import Image
 from pathlib import Path
 from torchvision import transforms
+import cv2
+import numpy as np
+from face_align import norm_crop
 
 
 def preprocess_celeba(path):
@@ -21,6 +24,18 @@ def preprocess_celeba(path):
     img.resize((64, 64), resample=resample).save(img_64_path)
 
     return None
+
+
+def preprocess_celeba_aligned(path):
+    data = path.split("\n")[0]
+    image_name = data.split(".jpg")[0]
+    landmarks = data.split(".jpg")[1].split("  ")
+    image_path = os.path.join(dataroot, "img_align_celeba", image_name + ".jpg")
+    print(image_path)
+    image = cv2.imread(image_path)
+    landmars_array = np.array([int(point) for point in landmarks])
+    aligned_image = norm_crop(image, landmars_array.reshape(5, 2), 112)
+    cv2.imwrite(image_path.replace(os.path.join(dataroot, "img_align_celeba"), target_root), aligned_image)
 
 
 def preprocess_chairs(path):
@@ -66,6 +81,14 @@ if __name__ == '__main__':
 
         os.system('unzip -q %s -d %s' % ((dataroot / 'img_align_celeba.zip'), dataroot))
         paths = list((dataroot / 'img_align_celeba').glob('*.jpg'))
+    elif dataset == 'celeba-aligned':
+        preprocess = preprocess_celeba_aligned
+        dataroot = '../../celeba'
+        target_root = os.path.join(dataroot, "celeba_arcface_aligned", "images")
+        os.makedirs(target_root, exist_ok=True)
+        landmarks_annotation_path = os.path.join(dataroot, "list_landmarks_align_celeba.txt")
+        f = open(landmarks_annotation_path, 'r')
+        paths = f.readlines()[2:]
 
     elif dataset == 'celeba-hq':
         preprocess = preprocess_celeba

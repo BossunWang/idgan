@@ -39,47 +39,73 @@ def return_data(args):
     dset_dir = args.dset_dir
     batch_size = args.batch_size
     num_workers = args.num_workers
-    image_size = 64
 
     if dsetname.lower() == 'chairs':
         root = os.path.join(dset_dir, 'Chairs_64')
         transform = transforms.Compose([
-            transforms.Resize((image_size, image_size)),
+            transforms.Resize((args.image_size, args.image_size)),
             transforms.ToTensor(),
             ])
-        train_kwargs = {'root':root, 'transform':transform}
+        train_kwargs = {'root': root, 'transform': transform}
         dset = CustomImageFolder
 
     elif dsetname.lower() == 'celeba':
-        root = os.path.join(dset_dir, 'CelebA_64')
+        root = os.path.join(dset_dir, dsetname, 'CelebA_128')
         transform = transforms.Compose([
-            transforms.Resize((image_size, image_size)),
+            transforms.Resize((args.image_size, args.image_size)),
             transforms.ToTensor(),
             ])
-        train_kwargs = {'root':root, 'transform':transform}
+        train_kwargs = {'root': root, 'transform': transform}
+        dset = CustomImageFolder
+
+    elif dsetname.lower() == 'ms1m-v3':
+        root = dset_dir
+        transform = transforms.Compose([
+            transforms.Resize((args.image_size, args.image_size)),
+            transforms.ToTensor(),
+            ])
+        train_kwargs = {'root': root, 'transform': transform}
+        dset = CustomImageFolder
+
+    elif dsetname.lower() == 'celeba_aligned':
+        root = dset_dir
+        transform = transforms.Compose([
+            transforms.Resize((args.image_size, args.image_size)),
+            transforms.ToTensor(),
+        ])
+        train_kwargs = {'root': root, 'transform': transform}
+        dset = CustomImageFolder
+
+    elif dsetname.lower() == 'umdface':
+        root = dset_dir
+        transform = transforms.Compose([
+            transforms.Resize((args.image_size, args.image_size)),
+            transforms.ToTensor(),
+            ])
+        train_kwargs = {'root': root, 'transform': transform}
         dset = CustomImageFolder
 
     elif dsetname.lower() == 'cars':
         root = os.path.join(dset_dir, 'Cars_64')
         transform = transforms.Compose([
-            transforms.Resize((image_size, image_size)),
+            transforms.Resize((args.image_size, args.image_size)),
             transforms.ToTensor(),
             ])
-        train_kwargs = {'root':root, 'transform':transform}
+        train_kwargs = {'root': root, 'transform': transform}
         dset = CustomImageFolder
 
     elif dsetname.lower() == 'dsprites':
         root = os.path.join(dset_dir, 'dsprites-dataset/dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz')
         data = np.load(root, encoding='bytes')
         data = torch.from_numpy(data['imgs']).unsqueeze(1).float()
-        train_kwargs = {'data_tensor':data}
+        train_kwargs = {'data_tensor': data}
         dset = CustomTensorDataset
 
     else:
         raise NotImplementedError
 
-
     train_data = dset(**train_kwargs)
+    print("data size:", len(train_data))
     train_loader = DataLoader(train_data,
                               batch_size=batch_size,
                               shuffle=True,

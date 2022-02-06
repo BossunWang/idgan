@@ -30,10 +30,11 @@ if __name__ == "__main__":
     parser.add_argument('--beta1', default=0.9, type=float, help='Adam optimizer beta1')
     parser.add_argument('--beta2', default=0.999, type=float, help='Adam optimizer beta2')
     parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
+    parser.add_argument('--image_size', default=112, type=int, help='learning rate')
     parser.add_argument('--dec_dist', default='gaussian', type=str, choices=['bernoulli', 'gaussian'], help='decoder distribution')
 
     parser.add_argument('--dset_dir', default='data', type=str, help='dataset directory')
-    parser.add_argument('--dataset', default='CelebA', type=str, choices=['dsprites', 'celeba', 'chairs', 'cars'], help='dataset name')
+    parser.add_argument('--dataset', default='CelebA', type=str, choices=['dsprites', 'celeba', 'chairs', 'cars', 'MS1M-V3', 'umdface', 'celeba_aligned'], help='dataset name')
     parser.add_argument('--num_workers', default=2, type=int, help='dataloader num_workers')
 
     parser.add_argument('--name', default='main', type=str, help='run name')
@@ -43,7 +44,6 @@ if __name__ == "__main__":
     parser.add_argument('--log_line_iter', default=100, type=int, help='')
     parser.add_argument('--log_img_iter', default=1000, type=int, help='')
     parser.add_argument('--ckpt_save_iter', default=10000, type=int, help='')
-
 
     args = parser.parse_args()
     print(args)

@@ -2,6 +2,7 @@ import os
 import random
 from tqdm import tqdm
 from math import sqrt
+import shutil
 
 import torch
 import torch.optim as optim
@@ -14,7 +15,7 @@ from gan_training.dvae.dataset import return_data
 from gan_training.dvae.loss import reconstruction_loss, kl_divergence
 
 
-__COLOR_DATASETS__ = ['chairs', 'cars', 'celeba']
+__COLOR_DATASETS__ = ['chairs', 'cars', 'celeba', 'ms1m-v3', 'umdface', 'celeba_aligned']
 
 
 class Solver(object):
@@ -36,8 +37,6 @@ class Solver(object):
         if not os.path.exists(self.ckpt_dir):
             os.makedirs(self.ckpt_dir, exist_ok=True)
         self.log_dir = os.path.join(self.output_dir, 'tensorboard')
-        if not os.path.exists(self.log_dir):
-            os.makedirs(self.log_dir, exist_ok=True)
 
         self.data_loader = return_data(args)
         self.writer = SummaryWriter(self.log_dir)
@@ -94,7 +93,6 @@ class Solver(object):
 
                     # visualize traverse
                     self.traverse(c_post=mu[:1], c_prior=torch.randn_like(mu[:1]))
-
 
                 if self.global_iter % self.ckpt_save_iter == 0:
                     self.save_checkpoint()

@@ -1,6 +1,7 @@
 from gan_training.models import (
-    resnet, resnet2, resnet3, dvae
+    resnet, resnet2, resnet3
 )
+from gan_training.dvae import dvae
 
 dvae_dict = {
     'BetaVAE_H': dvae.BetaVAE_H,

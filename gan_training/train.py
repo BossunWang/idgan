@@ -9,12 +9,14 @@ from torch import autograd
 
 class Trainer(object):
     def __init__(self, dvae, generator, discriminator, g_optimizer, d_optimizer,
-                 reg_param, w_info):
+                 g_loss, d_loss, reg_param, w_info):
         self.dvae = dvae
         self.generator = generator
         self.discriminator = discriminator
         self.g_optimizer = g_optimizer
         self.d_optimizer = d_optimizer
+        self.g_loss = g_loss
+        self.d_loss = d_loss
         self.reg_param = reg_param
         self.w_info = w_info
 
@@ -35,11 +37,11 @@ class Trainer(object):
         d_fake = self.discriminator(x_fake)
 
         gloss = self.compute_loss(d_fake, 1)
-        loss += gloss
+        loss += self.g_loss * gloss
 
         chs = self.dvae(x_fake, encode_only=True)
         encloss = self.compute_infomax(cs, chs)
-        loss += self.w_info*encloss
+        loss += self.w_info * encloss
 
         loss.backward()
         self.g_optimizer.step()
@@ -59,7 +61,7 @@ class Trainer(object):
         x_real.requires_grad_()
 
         d_real = self.discriminator(x_real)
-        dloss_real = self.compute_loss(d_real, 1)
+        dloss_real = self.d_loss * self.compute_loss(d_real, 1)
         dloss_real.backward(retain_graph=True)
         reg = self.reg_param * compute_grad2(d_real, x_real).mean()
         reg.backward()
@@ -72,7 +74,7 @@ class Trainer(object):
 
         x_fake.requires_grad_()
         d_fake = self.discriminator(x_fake)
-        dloss_fake = self.compute_loss(d_fake, 0)
+        dloss_fake = self.d_loss * self.compute_loss(d_fake, 0)
         dloss_fake.backward()
 
         self.d_optimizer.step()

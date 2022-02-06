@@ -27,6 +27,7 @@ class View(nn.Module):
     def __init__(self, size):
         super(View, self).__init__()
         self.size = size
+
     def forward(self, tensor):
         return tensor.view(self.size)
 
@@ -37,7 +38,7 @@ class Encoder(nn.Module):
         self.c_dim = c_dim
         self.nc = nc
         self.infodistil_mode = infodistil_mode
-        self.layer = nn.Sequential(
+        self.conv_layer = nn.Sequential(
             nn.Conv2d(nc, 32, 4, 2, 1),          # B,  32, 32, 32
             nn.ReLU(True),
             nn.Conv2d(32, 32, 4, 2, 1),          # B,  32, 16, 16
@@ -47,10 +48,9 @@ class Encoder(nn.Module):
             nn.Conv2d(64, 64, 4, 2, 1),          # B,  64,  4,  4
             nn.ReLU(True),
             nn.Conv2d(64, 256, 4, 1),            # B, 256,  1,  1
-            nn.ReLU(True),
-            View((-1, 256*1*1)),                 # B, 256
-            nn.Linear(256, c_dim*2),             # B, c_dim*2
+            nn.ReLU(True)
         )
+        self.fc_layer = nn.Linear(256 * 4 * 4, c_dim*2)
 
     def forward(self, x):
         if self.infodistil_mode:
@@ -58,7 +58,10 @@ class Encoder(nn.Module):
             if (x.size(2) > 64) or (x.size(3) > 64):
                 x = F.adaptive_avg_pool2d(x, (64, 64))
 
-        h = self.layer(x)
+        batch_size = x.size(0)
+        h = self.conv_layer(x)
+        h = h.view(batch_size, -1)
+        h = self.fc_layer(h)
         return h
 
 
@@ -67,21 +70,29 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.c_dim = c_dim
         self.nc = nc
+        upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         self.layer = nn.Sequential(
-            nn.Linear(c_dim, 256),               # B, 256
-            View((-1, 256, 1, 1)),               # B, 256,  1,  1
+            nn.Linear(c_dim, 256 * 7 * 7),  # B, 256
+            View((-1, 256, 7, 7)),               # B, 256,  7,  7
             nn.ReLU(True),
-            nn.ConvTranspose2d(256, 64, 4),      # B,  64,  4,  4
+            upsample,
+            nn.Conv2d(256, 128, 1),
+            nn.BatchNorm2d(128),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64, 64, 4, 2, 1), # B,  64,  8,  8
+            upsample,
+            nn.Conv2d(128, 64, 1),
+            nn.BatchNorm2d(64),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64, 32, 4, 2, 1), # B,  32, 16, 16
+            upsample,
+            nn.Conv2d(64, 32, 1),
+            nn.BatchNorm2d(32),
             nn.ReLU(True),
-            nn.ConvTranspose2d(32, 32, 4, 2, 1), # B,  32, 32, 32
+            nn.Conv2d(32, 16, 1),
+            nn.BatchNorm2d(16),
             nn.ReLU(True),
-            nn.ConvTranspose2d(32, nc, 4, 2, 1),  # B, nc, 64, 64
+            upsample,
+            nn.Conv2d(16, nc, 1)
         )
-
 
     def forward(self, c):
         x = self.layer(c)
@@ -117,22 +128,30 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
         self.z_dim = z_dim
         self.nc = nc
+        upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         self.layer = nn.Sequential(
-            nn.Linear(z_dim, 256),               # B, 256
-            View((-1, 256, 1, 1)),               # B, 256,  1,  1
+            nn.Linear(z_dim, 256 * 7 * 7),  # B, 256
+            View((-1, 256, 7, 7)),  # B, 256,  7,  7
             nn.ReLU(True),
-            nn.ConvTranspose2d(256, 64, 4),      # B,  64,  4,  4
+            upsample,
+            nn.Conv2d(256, 128, 1),
+            nn.BatchNorm2d(128),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64, 64, 4, 2, 1), # B,  64,  8,  8
+            upsample,
+            nn.Conv2d(128, 64, 1),
+            nn.BatchNorm2d(64),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64, 32, 4, 2, 1), # B,  32, 16, 16
+            upsample,
+            nn.Conv2d(64, 32, 1),
+            nn.BatchNorm2d(32),
             nn.ReLU(True),
-            nn.ConvTranspose2d(32, 32, 4, 2, 1), # B,  32, 32, 32
+            nn.Conv2d(32, 16, 1),
+            nn.BatchNorm2d(16),
             nn.ReLU(True),
-            nn.ConvTranspose2d(32, nc, 4, 2, 1),  # B, nc, 64, 64
+            upsample,
+            nn.Conv2d(16, nc, 1),
             nn.Tanh()
         )
-
 
     def forward(self, c):
         x = self.layer(c)
@@ -174,3 +193,22 @@ class BetaVAE_H(nn.Module):
 
     def _decode(self, c):
         return self.decoder(c)
+
+
+if __name__ == '__main__':
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    c_dim = 20
+    nc = 3
+    vae = BetaVAE_H(c_dim, nc).to(device)
+
+    input = torch.rand(12, 3, 112, 112).to(device)
+    x_recon, c, mu, logvar = vae(input)
+    print(x_recon.size())
+    print(c.size())
+    print(mu.size())
+    print(logvar.size())
+
+    generator = Generator(z_dim=c_dim, nc=nc).to(device)
+    output = generator(c)
+    print(output.size())
